@@ -11,6 +11,7 @@
 
 rm(list = ls())
 setwd("C:/Users/mabuq/Documents/M2_ENSAE/VAR-LP/Projet")
+set.seed(42)
 
 ## Library
 
@@ -19,23 +20,37 @@ library(minqa)
 library(mvnfast)
 library(HI) #install directly from the R archives as not available anymore from CRAN direct installation 
 
-remotes::install_github("https://github.com/cran/VARsignR/tree/master")
-remotes::install_github("roootra/ZerosignR")
-
-library(VARsignR)
-library(ZerosignR)
-library(BVAR)
+# remotes::install_github("https://github.com/cran/VARsignR/tree/master")
+# remotes::install_github("roootra/ZerosignR")
+# 
+# library(VARsignR)
+# library(ZerosignR)
+# library(BVAR)
 
 
 
 ## Source functions from external repositories in different files
 
-source("C:/Users/mabuq/Documents/M2_ENSAE/VAR-LP/Projet/function_package_SVAR_sign.R")
+#source("C:/Users/mabuq/Documents/M2_ENSAE/VAR-LP/Projet/function_package_SVAR_sign.R")
 source("C:/Users/mabuq/Documents/M2_ENSAE/VAR-LP/Projet/code_R/Fonctions_packages.R")
 
 ## Retrieve custom functions to make the code run
 
 source("C:/Users/mabuq/Documents/M2_ENSAE/VAR-LP/Projet/All_functions_VARsignR_modified.R")
+source("C:/Users/mabuq/Documents/M2_ENSAE/VAR-LP/Projet/RWZaccept_modified.R")
+source("C:/Users/mabuq/Documents/M2_ENSAE/VAR-LP/Projet/RWZreject_modified.R")
+source("C:/Users/mabuq/Documents/M2_ENSAE/VAR-LP/Projet/plot_figure_new.R")
+
+## Preliminary info for plot computation
+
+var_names = c("Real GDP (in log)", "CPI (in log)", "Asset Purchases", "Long rate", "Real Equity Prices")
+IRFs_horizon = 36
+Confidence_bands = c(16,84)
+Pspar = 0.675 # smoothness parameter for IRF. 0= no smoothing, 1= lots of smoothing, originally = 0.675
+SL = 11 # letter sizes ggplots
+WW = 14 # width graphs
+HH = 11 # height graphs
+
 
 ## Data import and first cleaning
 
@@ -54,11 +69,11 @@ Datastream_set_transformed = create_log_vars(Datastream_set, vars = c("CPI_US","
 
 VAR_data_1st = Datastream_set_transformed %>% select(CPI_US_log, Real_GDP_US_log, Asset_purchases_US, Yield_US_10Y , Real_Equity_Prices_US_log  )
 
-plot(x = 1: length(VAR_data_1st$CPI_US_log), y =  VAR_data_1st$CPI_US_log) # possibly trend
-plot(x = 1: length(VAR_data_1st$CPI_US_log), y =  VAR_data_1st$Real_GDP_US_log) # possibly trend
-plot(x = 1: length(VAR_data_1st$CPI_US_log), y =  VAR_data_1st$Asset_purchases_US)
-plot(x = 1: length(VAR_data_1st$CPI_US_log), y =  VAR_data_1st$Yield_US_10Y)
-plot(x = 1: length(VAR_data_1st$CPI_US_log), y =  VAR_data_1st$Real_Equity_Prices_US_log)
+# plot(x = 1: length(VAR_data_1st$CPI_US_log), y =  VAR_data_1st$CPI_US_log) # possibly trend
+# plot(x = 1: length(VAR_data_1st$CPI_US_log), y =  VAR_data_1st$Real_GDP_US_log) # possibly trend
+# plot(x = 1: length(VAR_data_1st$CPI_US_log), y =  VAR_data_1st$Asset_purchases_US)
+# plot(x = 1: length(VAR_data_1st$CPI_US_log), y =  VAR_data_1st$Yield_US_10Y)
+# plot(x = 1: length(VAR_data_1st$CPI_US_log), y =  VAR_data_1st$Real_Equity_Prices_US_log)
 
 ## Compute the RF VAR first
 
@@ -78,128 +93,86 @@ SVAR_Cholesky = SVAR(RF_VAR, Bmat = Cholesky_matrix )
 
 IRFs_Cholesky_US = vars::irf(SVAR_Cholesky, ci = 0.68) # IRFs computed for Cholesky for US (do the same for UK)
 
+IRFs_Cholesky_median = IRFs_Cholesky_US$irf$Asset_purchases_US[,3]
+IRFs_Cholesky_lower = IRFs_Cholesky_US$Lower$Asset_purchases_US[,3]
+IRFs_Cholesky_upper = IRFs_Cholesky_US$Upper$Asset_purchases_US[,3]
 
-### Compute SVAR for the second scheme ------
-
-
-## Some tests
-
-# Set impulse responses to a horizon of 20 time periods and enable FEVD
-# (Identification is performed via Cholesky decomposition)
-bv_irf(horizon = 20, fevd = TRUE)
-
-# Set up structural impulse responses using sign restrictions
-signs <- matrix(c(NA, NA, NA, NA, NA, -1, -1, 1, 1), nrow = 3)
-bv_irf(sign_restr = signs)
-
-# Set up structural impulse responses using zero and sign restrictions
-zero_signs <- matrix(c(NA, 0, NA, NA, NA, NA, -1, 1, 1), nrow = 3)
-test_2 = bv_irf(sign_restr = zero_signs)
-
-# Prepare to estimate unidentified impulse responses
-bv_irf(identification = FALSE)
-
-
-# Access a subset of the fred_qd dataset
-data <- fred_qd[, c("CPIAUCSL", "UNRATE", "FEDFUNDS")]
-# Transform it to be stationary
-data <- fred_transform(data, codes = c(5, 5, 1), lag = 4)
-
-# Estimate a BVAR using one lag, default settings and very few draws
-x <- bvar(data, lags = 1, n_draw = 1000L, n_burn = 200L, verbose = FALSE, irf = bv_irf(sign_restr = zero_signs) )
-
-# Calculate and store forecasts and impulse responses
-predict(x) <- predict(x, horizon = 8)
-irf(x) <- irf(x, horizon = 8, fevd = FALSE)
-
-## Not run: 
-# Check convergence of the hyperparameters with a trace and density plot
-plot(x)
-# Plot forecasts and impulse responses
-plot(predict(x))
-plot(irf(x))
-# Check coefficient values and variance-covariance matrix
-summary(x)
+### Compute SVAR for the the 3 remaining schemes ------
 
 
 
 
-### Compute SVAR for the third scheme -------
+## Implementation 
 
+# Data
 
-## Some tests using built-in data and functions
+SVAR_Fig_2_data = Datastream_set_transformed %>% 
+  filter(Period > 39845) %>%
+  select(CPI_US_log, Real_GDP_US_log, Asset_purchases_US, Yield_US_10Y, Real_Equity_Prices_US) %>%
+  as.matrix()
 
-set.seed(12345)
-data(uhligdata)
+## Specify sign restrictions
 
-# variable labels for plots
-vl <- c("GDP","GDP Deflator","Comm.Pr.Index","Fed Funds Rate",
-        "NB Reserves", "Total Reserves")
+# Second identification scheme
 
-# sign restrictions
-# shock of interest enters first.
-# you MUST provide a restriction for the shock of interest
-# restriction variable 4 is >0
-# 2nd, 3rd, and 5th variable are <0.
-# 1st and 6th variable are unrestricted
+Sign_restrictions_2nd_scheme = list(matrix(c(-1, 1, NA, NA, NA, 1, 1, NA, NA, NA, NA, NA, 1 , NA, NA, 1 , 1 , -1, NA, NA, 1 , 1 , 1 , NA, NA), nrow = 5), # Period 0
+                                    matrix(c(-1, 1, NA, NA, NA, 1, 1, NA, NA, NA, NA, NA, 1 , NA, NA, 1 , 1 , -1, NA, NA, 1 , 1 , 1 , NA, NA), nrow = 5)) # Period 1
+                                   #  matrix(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 1 , NA, NA, NA , NA , NA, NA, NA, NA , NA , NA , NA, NA), nrow = 5),
+                                   #  matrix(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 1 , NA, NA, NA , NA , NA, NA, NA, NA , NA , NA , NA, NA), nrow = 5),
+                                   #  matrix(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 1 , NA, NA, NA , NA , NA, NA, NA, NA , NA , NA , NA, NA), nrow = 5),
+                                   #  matrix(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 1 , NA, NA, NA , NA , NA, NA, NA, NA , NA , NA , NA, NA), nrow = 5))
 
-constr <- c(+4,-3,-2,-5)
+SVAR_model_2nd_scheme = RWZreject_modified(Y = SVAR_Fig_2_data, nlags = 2, draws = 10000, subdraws = 10000, nkeep = 1000, zero = FALSE, constrained = Sign_restrictions_2nd_scheme, constant =  TRUE, steps =  10)
 
-# estimates the model
-mode$l3 <- VARsignR::rwz.reject(Y=uhligdata, nlags=12, draws=200, subdraws=200, nkeep=1000,
-                     KMIN=1, KMAX=6, constrained=constr, constant=FALSE, steps=60)
+IRFs_2nd_scheme = SVAR_model_2nd_scheme$IRFS
 
-# get posterior draws
-irfs0 <- model3$IRFS
+IRFs = apply(IRFs_2nd_scheme, MARGIN = c(2,3,4) , FUN = median)
+IRFs_lower_bound_start = apply(IRFs_2nd_scheme, MARGIN = c(2,3,4) , FUN = quantile, probs =  Confidence_bands[1] / 100)
+IRFs_upper_bound_start = apply(IRFs_2nd_scheme, MARGIN = c(2,3,4) , FUN = quantile, probs =  Confidence_bands[2] / 100)
 
-# plot impulse response functions
+IRFs_median = Data_retrieval(IRFs, nb_var = 5, nb_shocks = 5, horizon = 10)[3,]
+IRFs_lower_bound = Data_retrieval(IRFs_lower_bound_start, nb_var = 5, nb_shocks = 5, horizon = 10)[3,]
+IRFs_upper_bound = Data_retrieval(IRFs_upper_bound_start, nb_var = 5, nb_shocks = 5, horizon = 10)[3,]
 
-vl <- c("GDP","GDP Deflator","Comm.Pr.Index","Fed Funds Rate",
-        "NB Reserves", "Total Reserves")
+Plot_IRFs_2nd_scheme = plot_figure_new(IRFs_median, IRFs_lower_bound, IRFs_upper_bound, horizon = 10, nb_var = 5 , shock = "Asset Purchase shock" , var_names = var_names   )
 
+# Third identification scheme
 
-irfplot(irfdraws=irfs0, type="mean", labels=vl, save=FALSE, bands=c(0.16, 0.84),
-        grid=TRUE, bw=FALSE)
+Sign_restrictions_3rd_scheme = list(matrix(c(-1, 1, NA, NA, NA, 1, 1, NA, NA, NA, 0, 0, 1 , 1, NA, NA , NA , NA, NA, NA, NA , NA , 1 , -1, NA), nrow = 5), # Period 0
+                                    matrix(c(-1, 1, NA, NA, NA, 1, 1, NA, NA, NA, 0, 0, 1 , 1, NA, NA , NA , NA, NA, NA, NA , NA , 1 , -1, NA), nrow = 5)) # Period 1
+#  matrix(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 1 , NA, NA, NA , NA , NA, NA, NA, NA , NA , NA , NA, NA), nrow = 5),
+#  matrix(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 1 , NA, NA, NA , NA , NA, NA, NA, NA , NA , NA , NA, NA), nrow = 5),
+#  matrix(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 1 , NA, NA, NA , NA , NA, NA, NA, NA , NA , NA , NA, NA), nrow = 5),
+#  matrix(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 1 , NA, NA, NA , NA , NA, NA, NA, NA , NA , NA , NA, NA), nrow = 5))
 
+debug(RWZreject_modified)
 
+SVAR_model_3rd_scheme = RWZreject_modified(Y = SVAR_Fig_2_data, nlags = 2, draws = 10000, subdraws = 10000, nkeep = 1000, zero = TRUE, constrained = Sign_restrictions_3rd_scheme, constant =  TRUE, steps =  10)
 
-## Test sign restrictions to implement
+IRFs_3rd_scheme = SVAR_model_3rd_scheme$IRFS
 
+IRFs = apply(IRFs_3rd_scheme, MARGIN = c(2,3,4) , FUN = median)
+IRFs_lower_bound_start = apply(IRFs_3rd_scheme, MARGIN = c(2,3,4) , FUN = quantile, probs =  Confidence_bands[1] / 100)
+IRFs_upper_bound_start = apply(IRFs_3rd_scheme, MARGIN = c(2,3,4) , FUN = quantile, probs =  Confidence_bands[2] / 100)
 
-test_sign_restrictions = list(matrix(c(NA, 0, NA, NA, NA, NA, -1, 1, 1), nrow = 3), matrix(c(NA, 0, NA, 1, NA, NA, -1, 0, 1), nrow = 3))
+IRFs_median = Data_retrieval(IRFs, nb_var = 5, nb_shocks = 5, horizon = 10)[3,]
+IRFs_lower_bound = Data_retrieval(IRFs_lower_bound_start, nb_var = 5, nb_shocks = 5, horizon = 10)[3,]
+IRFs_upper_bound = Data_retrieval(IRFs_upper_bound_start, nb_var = 5, nb_shocks = 5, horizon = 10)[3,]
 
-#### Test Fevd
+Plot_IRFs_3rd_scheme = plot_figure_new(IRFs_median, IRFs_lower_bound, IRFs_upper_bound, horizon = 10, nb_var = 5 , shock = "Asset Purchase shock" , var_names = var_names   )
 
-rdm_col = as.matrix(runif(5)) 
-rdm_col[2] 
-test_true = if (rdm_col[3] == max(rdm_col)) {T} else {F}
-test_true
+# Fourth identification scheme
 
+Sign_restrictions_4th_scheme = list(matrix(c(-1, 1, NA, NA, NA, 1, 1, NA, NA, NA, NA, NA, 1 , NA, NA, NA , NA , NA, NA, NA, NA , NA , NA , NA, NA), nrow = 5), # Period 0
+                                    matrix(c(-1, 1, NA, NA, NA, 1, 1, NA, NA, NA, NA, NA, 1 , NA, NA, NA , NA , NA, NA, NA, NA , NA , NA , NA, NA), nrow = 5)) # Period 1
+#  matrix(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 1 , NA, NA, NA , NA , NA, NA, NA, NA , NA , NA , NA, NA), nrow = 5),
+#  matrix(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 1 , NA, NA, NA , NA , NA, NA, NA, NA , NA , NA , NA, NA), nrow = 5),
+#  matrix(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 1 , NA, NA, NA , NA , NA, NA, NA, NA , NA , NA , NA, NA), nrow = 5),
+#  matrix(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 1 , NA, NA, NA , NA , NA, NA, NA, NA , NA , NA , NA, NA), nrow = 5))
 
+FEVD_check = list(matrix(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 0, 0, 1 , NA, NA, NA , NA , NA, NA, NA, NA , NA , NA , NA, NA), nrow = 5),
+                  matrix(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 0, 0, 1 , NA, NA, NA , NA , NA, NA, NA, NA , NA , NA , NA, NA), nrow = 5),
+                  matrix(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 0, 0, 1 , NA, NA, NA , NA , NA, NA, NA, NA , NA , NA , NA, NA), nrow = 5))
 
+SVAR_model_4th_scheme = RWZreject_modified(Y = SVAR_Fig_2_data, nlags = 2, draws = 10000, subdraws = 10000, nkeep = 1000, zero = TRUE, constrained = Sign_restrictions_3rd_scheme, FEVD_check = FEVD_check, constant =  TRUE, steps =  10)
 
-######## Test avec mes propres fonctions 
-
-zero = TRUE
-test_sign_restrictions = list(matrix(c(NA, 0, NA, NA, NA, NA, -1, 1, 1), nrow = 3), matrix(c(NA, 0, NA, 1, NA, NA, -1, 0, 1), nrow = 3))
-constrained = test_sign_restrictions
-sign_restr = test_sign_restrictions
-a <- matrix(rnorm(nvar^2, mean = 0, sd = 1), nvar, nvar)
-qr_object <- qr(matrix(rnorm(nvar^2, 0, 1), nvar, nvar))
-Q <- qr.Q(qr_object)
-shock = t(fevd0[3,,] %*% Q^2)
-test_sum = sum(shock[,6])
-test_sum
-
-View(shock)
-shock_vec <- as.vector(shock)
-View(shock_vec)
-shock_vec[which(shock_vec > 0)] <- 1
-View(sign_vec)
-
-FEVD_check = list(matrix(c(NA, NA, NA, NA, NA , NA, NA, NA, NA, NA,0,0,1,NA,NA,NA, NA, NA, NA, NA , NA, NA, NA, NA, NA), nrow = 5))
-View(fevd_vec)
-fevd_sign_vec = as.vector(FEVD_check[[1]])
-View(fevd_sign_vec)
-restricted <- which(!is.na(fevd_sign_vec))
-View(fevd_vec_restricted)

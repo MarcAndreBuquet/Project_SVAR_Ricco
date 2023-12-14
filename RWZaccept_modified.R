@@ -1,7 +1,7 @@
 ## RWZaccept_modified
 
 
-function (a, nvar = nvar, zero = FALSE, constrained, impulses, FEVD_check, fevd0) # constrained prendra les matrices spécifiées + rajouter un test de FEVDs
+RWZAccept_modified <- function (a, nvar = nvar, zero = FALSE, constrained, impulses, FEVD_check, fevd0, swish = swish) # constrained prendra les matrices spécifiées + rajouter un test de FEVDs
   
 {
   if(!zero) { # Sign restrictions only
@@ -12,7 +12,7 @@ function (a, nvar = nvar, zero = FALSE, constrained, impulses, FEVD_check, fevd0
      R <- qr.R(qr_object)
   } else { # if addition of Zero restrictions (Arias, 2018)
     Q <- matrix(0, nvar, nvar)
-    sign_restr_selected = sign_restr[[1]]
+    sign_restr_selected = constrained[[1]]
     
     for(i in seq_len(nvar)) { # Build up Q
       
@@ -20,15 +20,14 @@ function (a, nvar = nvar, zero = FALSE, constrained, impulses, FEVD_check, fevd0
       R <- rbind(t(swish)[slct_row, ], Q[seq_len(i - 1), ]) # A priori, remplacer sigma_chol par t(swish)
       qr_object <- qr(t(R))
       qr_rank <- qr_object[["rank"]]
-      set <- if(qr_rank == 0) {seq_len(M)} else {-seq_len(qr_rank)}
+      set <- if(qr_rank == 0) {seq_len(nvar)} else {-seq_len(qr_rank)}
       N_i <- qr.Q(qr_object, complete = TRUE)[, set, drop = FALSE]
       N_stdn <- crossprod(N_i, rnorm(nvar, 0, 1))
       q_i <- N_i %*% (N_stdn / norm(N_stdn, type = "2"))
       Q[i, ] <- q_i
     }
     Q <- t(Q)
-  }    ## Marche jusque-là
-  
+  }    
   
   ###### New code for checking the sign restrictions
   
@@ -64,14 +63,14 @@ function (a, nvar = nvar, zero = FALSE, constrained, impulses, FEVD_check, fevd0
   
   for (j in 1:length(constrained)) {
     
-    shock = t(impulses[j,,] %*% Q) # ici variables en colonne et chocs en ligne donc OK
+    shock = t(impulses[j,,] %*% Q) # ici variables en colonne et chocs en ligne donc OK par rapport aux spécifications
     shock[abs(shock) < 1e-8] <- 0 # changer éventuellement l'arrondi à 0 et le réaugmenter si nécessaire
     
     shock_vec <- as.vector(shock)
     shock_vec[which(shock_vec < 0)] <- -1
     shock_vec[which(shock_vec > 0)] <- 1
     
-    sign_vec <- as.vector(sign_restr[[j]])
+    sign_vec <- as.vector(constrained[[j]])
     
     ## Rajouter un restricted
     
@@ -102,68 +101,20 @@ function (a, nvar = nvar, zero = FALSE, constrained, impulses, FEVD_check, fevd0
       
       fevd_ref = which(fevd_sign_vec_restricted == 1)
       
-      
-      # selected_column = which(apply(FEVD_check[[i]], 2, function(col) any(col == 1)))
-      # fevd_col = fevd[,selected_column]
-      # 
-      # selected_row = which(apply(selected_column, 1, function(row) all(row %in% c(0, 1))))
-      # fevd_row = fevd_col[selected_row,]
-      # 
-      # ref_row = which(fevd_row == 1)
-      # 
-      
       if (fevd_vec_restricted[fevd_ref] == max(fevd_vec_restricted)) {count_FEVD = count_FEVD + 1}
       }
   }
  
   ## End of code for checking FEVDs 
   
-  ##
+  ## Return what is needed for the remaining of the function
   
   if (!is.null(FEVD_check)) {
-      if (count = length(constrained) & count_FEVD = length(FEVD_check)) {acc = 1}
+      if (count == length(constrained) && count_FEVD == length(FEVD_check)) {acc = 1}
       else {acc = 0}}
-  else {if (count = length(constrained)) {acc = 1}
+  else {if (count == length(constrained)) {acc = 1}
     else {acc = 0}}
   
   rwz <- list(Q = Q, acc = acc)
   return(rwz)
-  
-  
-  
-  
-  
-  
-  
- #  QR <- qr(a)
- #  R <- qr.R(QR)
- #  Q <- qr.Q(QR)
- #  if (R < 0) {
- #    Q <- -1 * Q
- #  }
- #  for (k in first:last) {
- #    ik <- impulses[k, , ] %*% Q # A garder tel quel
- #    for (i in 1:length(constrained)) {
- #      if (constrained[i] < 0) {
- #        value <- ik[-1 * constrained[i]]
- #      }
- #      else {
- #        value <- -1 * ik[constrained[i]]
- #      }
- #      if (value < 0) {
- #        if (k == first & i == 1) {
- #          Q <- 1 * Q
- #          ik <- 1 * ik
- #        }
- #      }
- #      else {
- #        acc <- 0
- #        rwz <- list(Q = Q, acc = acc, ika = ik)
- #        return(rwz)
- #      }
- #    }
- #  }
- #  acc <- 1
- #  rwz <- list(Q = Q, acc = acc, ika = ik)
- #  return(rwz)
 }

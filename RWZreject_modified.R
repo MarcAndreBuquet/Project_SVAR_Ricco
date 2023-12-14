@@ -1,4 +1,4 @@
-function (Y = NULL, nlags = 4, draws = 200, subdraws = 200, nkeep = 1000, zero = FALSE,  # rajouter argument zero = FALSE, fevd_check = NULL (fait)
+RWZreject_modified <- function (Y = NULL, nlags = 4, draws = 200, subdraws = 200, nkeep = 1000, zero = FALSE,  # rajouter argument zero = FALSE, fevd_check = NULL (fait)
           FEVD_check = NULL, KMIN = 1, KMAX = 4, constrained = NULL, constant = TRUE, 
           steps = 24) 
 {
@@ -49,8 +49,8 @@ function (Y = NULL, nlags = 4, draws = 200, subdraws = 200, nkeep = 1000, zero =
   goodresp <- array(NA, c(nkeep, nstep, nvar, nvar)) # à modifier pour ajouter une autre dimension (à priori c(nkeep, nstep, nvar, nvar)) (fait)
   BDraws <- array(NA, c(n1, nncoef, nvar)) # a l'air OK en terme de dimensionnalité
   SDraws <- array(NA, c(n1, nvar, nvar)) # OK dimensionnalité
-  imp <- matrix(NA, nrow = nstep, ncol = nvar, nvar) # rajouter une dimension (fait)
-  fevd <- matrix(NA, nrow = nstep, ncol = nvar , nvar) # rajouter une dimension (fait)
+  imp <- array(NA, c(nstep, nvar, nvar)) # rajouter une dimension (fait) et transformer en array (fait)
+  fevd <- array(NA, c(nstep, nvar, nvar)) # rajouter une dimension (fait)
   goodfevd <- array(NA, c(nkeep, nstep, nvar , nvar)) # à modifier comme précédemment (fait)
   goodshock <- array(NA, c(nkeep, nnobs))
   uhatt <- matrix(NA, nnobs, 1)
@@ -78,25 +78,28 @@ function (Y = NULL, nlags = 4, draws = 200, subdraws = 200, nkeep = 1000, zero =
     for (subdraws in 1:n2) {
       a <- matrix(rnorm(nvar^2, mean = 0, sd = 1), nvar,  ###### à modifier pour pouvoir prendre en compte les restrictions sur plus d'une seule variable (modification faite)
                   nvar)
-      RWZA <- RWZAccept(a, nvar = nvar, zero = zero, FEVD_check = FEVD_check, fevd0 = fevd0,  KMIN, KMAX, constrained, impulses)
+      RWZA <- RWZAccept_modified(a, nvar = nvar, zero = zero, FEVD_check = FEVD_check, fevd0 = fevd0, constrained = constrained, impulses = impulses, swish = swish)
       RWZ <- RWZA$acc
       q <- RWZA$Q
       if (RWZ == 1) {
         for (j in 1:nstep) {
-          imp[j, ] <- t(impulses[j, , ] %*% q)
-          fevd[j, ] <- t(fevd0[j, , ] %*% (q^2))
+          imp[j, ,] <- t(impulses[j, , ] %*% q)
+          fevd[j, , ] <- t(fevd0[j, , ] %*% (q^2))
         }
         accept <- accept + 1
-        goodresp[accept, , ] <- imp
-        goodfevd[accept, , ] <- fevd * 100
+        goodresp[accept, , , ] <- imp     # modifié en correspondance avec le chgt définitionnel précédent
+        goodfevd[accept, , , ] <- fevd * 100 # pareil (rajout d'une virgule)
         BDraws[draws, , ] <- betadraw
         SDraws[draws, , ] <- sigmad
-        uhat <- Y[nnobs0:nobs, ] - data %*% bhat
-        for (i in 1:nnobs) {
-          uhatt[i, ] <- uhat[i, ] %*% (solve(swish) %*% 
-                                         q)
-        }
-        goodshock[accept, ] <- t(uhatt)
+        uhat <- Y[nnobs0:nobs, ] - data %*% bhat # OK
+        
+        ## enlever car inutile et rajoute du temps de calcul
+        
+        # for (i in 1:nnobs) {
+        #   uhatt[i, ] <- uhat[i, ] %*% (solve(swish) %*% 
+        #                                  q)
+        # }
+        # goodshock[accept, ] <- t(uhatt)
       }
       else {
         next
@@ -121,16 +124,16 @@ function (Y = NULL, nlags = 4, draws = 200, subdraws = 200, nkeep = 1000, zero =
       stop("\n Not enough accepted draws to proceed!")
     }
     else {
-      goodresp <- goodresp[1:accept, , ]
-      goodfevd <- goodfevd[1:accept, , ]
-      goodshock <- goodshock[1:accept, ]
+      goodresp <- goodresp[1:accept, , ,] # à modifier (fait)
+      goodfevd <- goodfevd[1:accept, , ,] # à modifier (fait)
+    #  goodshock <- goodshock[1:accept, ]
       message("\n Warning! Had only ", accept, " accepted draw(s) out of ", 
               ntot, ".", sep = "")
     }
   }
   nn1 <- accept
-  dimnames(goodresp) <- list(1:nn1, 1:nstep, varnames)
-  dimnames(goodfevd) <- list(1:nn1, 1:nstep, varnames)
+  #  dimnames(goodresp) <- list(1:nn1, 1:nstep, varnames)
+  #  dimnames(goodfevd) <- list(1:nn1, 1:nstep, varnames)
   if (constant == FALSE) {
     dimnames(BDraws) <- list(1:ldraw, c(paste(varnames, rep(1:nlags, 
                                                             each = length(varnames)), sep = "")), varnames)
@@ -141,6 +144,6 @@ function (Y = NULL, nlags = 4, draws = 200, subdraws = 200, nkeep = 1000, zero =
                              varnames)
   }
   message("\n MCMC finished, ", date(), ".", sep = "")
-  return(list(IRFS = goodresp, FEVDS = goodfevd, SHOCKS = goodshock, 
+  return(list(IRFS = goodresp, FEVDS = goodfevd, #SHOCKS = goodshock, 
               BDraws = BDraws, SDraws = SDraws))
 }

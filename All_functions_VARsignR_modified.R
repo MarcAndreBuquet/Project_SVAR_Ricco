@@ -613,7 +613,7 @@ rfvar <-
     vldvr$u <- vldvr$u[, 1:dfx]
     vldvr$v <- vldvr$v[, 1:dfx]
     snglty <- dim(X)[2] - dfx
-    B <- vldvr$v %*% (di * (t(vldvr$u) %*% y))
+    B <- vldvr$v %*% (di * (t(vldvr$u) %*% y)) 
     u <-  y-X %*% B
     if (!is.null(tsp(ydata))) u <- ts(u, start=start(ydata)+c(0,lags),frequency=frequency(ydata))
     nX <- dim(X)[2]
@@ -2218,83 +2218,83 @@ UhligPenalty <-
 ## RWZaccept_modified
 
 
-RWZaccept_modified <- function (a, nvar = nvar, zero = FALSE, constrained, impulses, FEVD_check, fevd0) # constrained prendra les matrices spécifiées + rajouter un test de FEVDs
-  
-{
-  if(!zero) { # Sign restrictions only
-    #   qr_object <- qr(matrix(rnorm(M ^ 2, 0, 1), M, M))
-    #   Q <- qr.Q(qr_object)
-    Q <- qr.Q(a) 
-    R <- qr.R(a)
-  } else { # if addition of Zero restrictions (Arias, 2018)
-    Q <- matrix(0, nvar, nvar)
-    for(i in seq_len(nvar)) { # Build up Q
-      slct_row <- which(sign_restr[, i] == 0) ## A modifier en f° de comment on écrit les restrictions
-      R <- rbind(t(swish)[slct_row, ], Q[seq_len(i - 1), ]) # A priori, remplacer sigma_chol par t(swish)
-      qr_object <- qr(t(R))
-      qr_rank <- qr_object[["rank"]]
-      set <- if(qr_rank == 0) {seq_len(M)} else {-seq_len(qr_rank)}
-      N_i <- qr.Q(qr_object, complete = TRUE)[, set, drop = FALSE]
-      N_stdn <- crossprod(N_i, rnorm(M, 0, 1))
-      q_i <- N_i %*% (N_stdn / norm(N_stdn, type = "2"))
-      Q[i, ] <- q_i
-    }
-    Q <- t(Q)
-  }
-  
-  
-  ###### New code for checking the sign restrictions
-  
-  
-  ## Verify sign restrictions
-  
-  count <- 0
-  
-  for (i in 1:length(constrained)) {
-    
-    shock = t(impulses[j,,] %*% Q)
-    shock[abs(shock) < 1e-10] <- 0
-    
-    shock_vec <- as.vector(shock)
-    shock_vec[which(shock_vec < 0)] <- -1
-    shock_vec[which(shock_vec > 0)] <- 1
-    
-    sign_vec <- as.vector(sign_restr[[i]])
-    
-    if(identical(shock_vec[restricted], sign_vec[restricted])) {count = count + 1}
-  }
-  
-  ## Code for checking FEVDs
-  
-  if (!is.null(FEVD_check)) {
-    
-    count_FEVD = 0
-    
-    for (i in 1:length(FEVD_check)) {
-      
-      fevd = t(fevd0[i, , ] %*% (Q^2))
-      
-      selected_column = which(apply(FEVD_check[[i]], 2, function(col) any(col == 1)))
-      fevd_col = fevd[,selected_column]
-      
-      selected_row = which(apply(selected_column, 1, function(row) all(row %in% c(0, 1))))
-      fevd_row = fevd_col[selected_row,]
-      
-      ref_row = which(fevd_row == 1)
-      
-      
-      if (fevd_row[ref_row] == max(fevd_row)) {count_FEVD = count_FEVD + 1}
-    }
-  }
-  
-  ## Return the different results needed for the rest of the estimation
-  
-  if (!is.null(FEVD_check)) {
-    if (count == length(constrained) & count_FEVD == length(FEVD_check)) {acc = 1}
-    else {acc = 0}}
-  else {if (count == length(constrained)) {acc = 1}
-    else {acc = 0}}
-  
-  rwz <- list(Q = Q, acc = acc)
-  return(rwz)
-}
+# RWZaccept_modified <- function (a, nvar = nvar, zero = FALSE, constrained, impulses, FEVD_check, fevd0) # constrained prendra les matrices spécifiées + rajouter un test de FEVDs
+#   
+# {
+#   if(!zero) { # Sign restrictions only
+#     #   qr_object <- qr(matrix(rnorm(M ^ 2, 0, 1), M, M))
+#     #   Q <- qr.Q(qr_object)
+#     Q <- qr.Q(a) 
+#     R <- qr.R(a)
+#   } else { # if addition of Zero restrictions (Arias, 2018)
+#     Q <- matrix(0, nvar, nvar)
+#     for(i in seq_len(nvar)) { # Build up Q
+#       slct_row <- which(sign_restr[, i] == 0) ## A modifier en f° de comment on écrit les restrictions
+#       R <- rbind(t(swish)[slct_row, ], Q[seq_len(i - 1), ]) # A priori, remplacer sigma_chol par t(swish)
+#       qr_object <- qr(t(R))
+#       qr_rank <- qr_object[["rank"]]
+#       set <- if(qr_rank == 0) {seq_len(M)} else {-seq_len(qr_rank)}
+#       N_i <- qr.Q(qr_object, complete = TRUE)[, set, drop = FALSE]
+#       N_stdn <- crossprod(N_i, rnorm(M, 0, 1))
+#       q_i <- N_i %*% (N_stdn / norm(N_stdn, type = "2"))
+#       Q[i, ] <- q_i
+#     }
+#     Q <- t(Q)
+#   }
+#   
+#   
+#   ###### New code for checking the sign restrictions
+#   
+#   
+#   ## Verify sign restrictions
+#   
+#   count <- 0
+#   
+#   for (i in 1:length(constrained)) {
+#     
+#     shock = t(impulses[j,,] %*% Q)
+#     shock[abs(shock) < 1e-10] <- 0
+#     
+#     shock_vec <- as.vector(shock)
+#     shock_vec[which(shock_vec < 0)] <- -1
+#     shock_vec[which(shock_vec > 0)] <- 1
+#     
+#     sign_vec <- as.vector(sign_restr[[i]])
+#     
+#     if(identical(shock_vec[restricted], sign_vec[restricted])) {count = count + 1}
+#   }
+#   
+#   ## Code for checking FEVDs
+#   
+#   if (!is.null(FEVD_check)) {
+#     
+#     count_FEVD = 0
+#     
+#     for (i in 1:length(FEVD_check)) {
+#       
+#       fevd = t(fevd0[i, , ] %*% (Q^2))
+#       
+#       selected_column = which(apply(FEVD_check[[i]], 2, function(col) any(col == 1)))
+#       fevd_col = fevd[,selected_column]
+#       
+#       selected_row = which(apply(selected_column, 1, function(row) all(row %in% c(0, 1))))
+#       fevd_row = fevd_col[selected_row,]
+#       
+#       ref_row = which(fevd_row == 1)
+#       
+#       
+#       if (fevd_row[ref_row] == max(fevd_row)) {count_FEVD = count_FEVD + 1}
+#     }
+#   }
+#   
+#   ## Return the different results needed for the rest of the estimation
+#   
+#   if (!is.null(FEVD_check)) {
+#     if (count == length(constrained) & count_FEVD == length(FEVD_check)) {acc = 1}
+#     else {acc = 0}}
+#   else {if (count == length(constrained)) {acc = 1}
+#     else {acc = 0}}
+#   
+#   rwz <- list(Q = Q, acc = acc)
+#   return(rwz)
+# }
