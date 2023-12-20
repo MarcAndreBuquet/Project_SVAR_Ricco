@@ -1,7 +1,7 @@
 
 # _______________________________________________________________________   
 #' @Title : Code SVAR Weale Wieladek
-#' @author: Marc-Andr� Buquet
+#' @author: Marc-Andr� Buquet
 #' @date: 26/11/2023
 #  Mail: marc-andre.buquet@ensae.fr  
 # _______________________________________________________________________       
@@ -10,7 +10,8 @@
 ## clean environment
 
 rm(list = ls())
-setwd("C:/Users/mabuq/Documents/M2_ENSAE/VAR-LP/Projet")
+# setwd("C:/Users/mabuq/Documents/M2_ENSAE/VAR-LP/Projet")
+# comptons sur le fait que le dossier de travail actuel est le bon
 set.seed(42)
 
 ## Library
@@ -30,16 +31,17 @@ library(HI) #install directly from the R archives as not available anymore from 
 
 
 ## Source functions from external repositories in different files
+# Let's take relative paths instead of absolute paths, so that the code can be run on any computer. ~~~~Nicolas
 
-#source("C:/Users/mabuq/Documents/M2_ENSAE/VAR-LP/Projet/function_package_SVAR_sign.R")
-source("C:/Users/mabuq/Documents/M2_ENSAE/VAR-LP/Projet/code_R/Fonctions_packages.R")
+#source("./function_package_SVAR_sign.R")
+source("./Fonctions_packages.R") # Mon organisation de fichiers est différente de celle de Marc-André : mon code est à la racine du working directory ; les données sont dans un dossier data. ~~~~Nicolas
 
 ## Retrieve custom functions to make the code run
 
-source("C:/Users/mabuq/Documents/M2_ENSAE/VAR-LP/Projet/All_functions_VARsignR_modified.R")
-source("C:/Users/mabuq/Documents/M2_ENSAE/VAR-LP/Projet/RWZaccept_modified.R")
-source("C:/Users/mabuq/Documents/M2_ENSAE/VAR-LP/Projet/RWZreject_modified.R")
-source("C:/Users/mabuq/Documents/M2_ENSAE/VAR-LP/Projet/plot_figure_new.R")
+source("./All_functions_VARsignR_modified.R")
+source("./RWZaccept_modified.R")
+source("./RWZreject_modified.R")
+source("./plot_figure_new.R")
 
 ## Preliminary info for plot computation
 
@@ -54,7 +56,7 @@ HH = 11 # height graphs
 
 ## Data import and first cleaning
 
-Datastream_set = rio::import("C:/Users/mabuq/Documents/M2_ENSAE/VAR-LP/Projet/Data_Time_Series_Weale_Wieladeck.xlsx") %>% 
+Datastream_set = rio::import("./Data_Time_Series_Weale_Wieladeck.xlsx") %>% 
   slice(-c(1:4)) %>%
   lapply(., as.numeric) %>%
   as.data.frame() %>%
