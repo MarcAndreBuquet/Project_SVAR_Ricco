@@ -56,7 +56,7 @@ HH = 11 # height graphs
 
 ## Data import and first cleaning
 
-Datastream_set = rio::import("./Data_Time_Series_Weale_Wieladeck.xlsx") %>% 
+Datastream_set = rio::import("./data/Data_Time_Series_Weale_Wieladeck.xlsx") %>% 
   slice(-c(1:4)) %>%
   lapply(., as.numeric) %>%
   as.data.frame() %>%
