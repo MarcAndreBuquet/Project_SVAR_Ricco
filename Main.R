@@ -79,7 +79,6 @@ VAR_data_1st = Datastream_set_transformed %>% select(CPI_US_log, Real_GDP_US_log
 
 VARselect(VAR_data_1st, lag.max = 12, type = c("both"))
           
-
 RF_VAR = vars::VAR(VAR_data_1st, type = "trend" )
 
 RF_VAR
@@ -99,9 +98,6 @@ IRFs_Cholesky_upper = IRFs_Cholesky_US$Upper$Asset_purchases_US[,3]
 
 ### Compute SVAR for the the 3 remaining schemes ------
 
-
-
-
 ## Implementation 
 
 # Data
@@ -110,6 +106,13 @@ SVAR_Fig_2_data = Datastream_set_transformed %>%
   filter(Period > 39845) %>%
   select(CPI_US_log, Real_GDP_US_log, Asset_purchases_US, Yield_US_10Y, Real_Equity_Prices_US) %>%
   as.matrix()
+
+SVAR_Fig_2_data = Datastream_set_transformed %>% 
+  filter(Period > 39845) %>%
+  select(CPI_US, Real_GDP_US, Asset_purchases_US, Yield_US_10Y, Real_Equity_Prices_US) %>%
+  as.matrix()
+
+
 
 ## Specify sign restrictions
 
@@ -122,7 +125,9 @@ Sign_restrictions_2nd_scheme = list(matrix(c(-1, 1, NA, NA, NA, 1, 1, NA, NA, NA
                                    #  matrix(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 1 , NA, NA, NA , NA , NA, NA, NA, NA , NA , NA , NA, NA), nrow = 5),
                                    #  matrix(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 1 , NA, NA, NA , NA , NA, NA, NA, NA , NA , NA , NA, NA), nrow = 5))
 
-SVAR_model_2nd_scheme = RWZreject_modified(Y = SVAR_Fig_2_data, nlags = 2, draws = 10000, subdraws = 10000, nkeep = 1000, zero = FALSE, constrained = Sign_restrictions_2nd_scheme, constant =  TRUE, steps =  10)
+debug(RWZreject_modified)
+
+SVAR_model_2nd_scheme = RWZreject_modified(Y = SVAR_Fig_2_data, nlags = 2, draws = 100, subdraws = 100, nkeep = 1000, zero = FALSE, constrained = Sign_restrictions_2nd_scheme, constant =  TRUE, steps =  10)
 
 IRFs_2nd_scheme = SVAR_model_2nd_scheme$IRFS
 
@@ -138,16 +143,24 @@ Plot_IRFs_2nd_scheme = plot_figure_new(IRFs_median, IRFs_lower_bound, IRFs_upper
 
 # Third identification scheme
 
-Sign_restrictions_3rd_scheme = list(matrix(c(-1, 1, NA, NA, NA, 1, 1, NA, NA, NA, 0, 0, 1 , 1, NA, NA , NA , NA, NA, NA, NA , NA , 1 , -1, NA), nrow = 5), # Period 0
-                                    matrix(c(-1, 1, NA, NA, NA, 1, 1, NA, NA, NA, 0, 0, 1 , 1, NA, NA , NA , NA, NA, NA, NA , NA , 1 , -1, NA), nrow = 5)) # Period 1
+Sign_restrictions_3rd_scheme = list(matrix(c(-1, 1, NA, NA, NA, 1, 1, NA, NA, NA, NA, NA, 1 , 1, NA, NA , NA , NA, NA, NA, NA , NA , 1 , -1, NA), nrow = 5), # Period 0
+                                    matrix(c(-1, 1, NA, NA, NA, 1, 1, NA, NA, NA, NA, NA, 1 , 1, NA, NA , NA , NA, NA, NA, NA , NA , 1 , -1, NA), nrow = 5)) # Period 1
 #  matrix(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 1 , NA, NA, NA , NA , NA, NA, NA, NA , NA , NA , NA, NA), nrow = 5),
 #  matrix(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 1 , NA, NA, NA , NA , NA, NA, NA, NA , NA , NA , NA, NA), nrow = 5),
 #  matrix(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 1 , NA, NA, NA , NA , NA, NA, NA, NA , NA , NA , NA, NA), nrow = 5),
 #  matrix(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 1 , NA, NA, NA , NA , NA, NA, NA, NA , NA , NA , NA, NA), nrow = 5))
 
+Z_1 = matrix(c(0,0,1,0,0,0,0,1,0,0), ncol = 10 , nrow = 1)
+Z_2 = matrix(c(0,0,1,0,0,0,0,1,0,0), ncol = 10 , nrow = 1)
+Z_cell = list(Z_1,Z_2,NULL,NULL,NULL)
+
 debug(RWZreject_modified)
 
-SVAR_model_3rd_scheme = RWZreject_modified(Y = SVAR_Fig_2_data, nlags = 2, draws = 10000, subdraws = 10000, nkeep = 1000, zero = TRUE, constrained = Sign_restrictions_3rd_scheme, constant =  TRUE, steps =  10)
+SVAR_model_3rd_scheme = RWZreject_modified(Y = SVAR_Fig_2_data, nlags = 2, draws = 100, subdraws = 100, nkeep = 10, zero = TRUE, zero_period = 2, zero_list = Z_cell ,  constrained = Sign_restrictions_3rd_scheme, constant =  TRUE, steps = 10)
+
+undebug(RWZreject_modified)
+
+SVAR_model_3rd_scheme = RWZreject_modified(Y = SVAR_Fig_2_data, nlags = 2, draws = 10000, subdraws = 10000, nkeep = 1000, zero = TRUE, zero_period = 2, constrained = Sign_restrictions_3rd_scheme, constant =  TRUE, steps = 40)
 
 IRFs_3rd_scheme = SVAR_model_3rd_scheme$IRFS
 
@@ -159,7 +172,7 @@ IRFs_median = Data_retrieval(IRFs, nb_var = 5, nb_shocks = 5, horizon = 10)[3,]
 IRFs_lower_bound = Data_retrieval(IRFs_lower_bound_start, nb_var = 5, nb_shocks = 5, horizon = 10)[3,]
 IRFs_upper_bound = Data_retrieval(IRFs_upper_bound_start, nb_var = 5, nb_shocks = 5, horizon = 10)[3,]
 
-Plot_IRFs_3rd_scheme = plot_figure_new(IRFs_median, IRFs_lower_bound, IRFs_upper_bound, horizon = 10, nb_var = 5 , shock = "Asset Purchase shock" , var_names = var_names   )
+Plot_IRFs_3rd_scheme = plot_figure_new(IRFs_median, IRFs_lower_bound, IRFs_upper_bound, horizon = 10, nb_var = 5 , shock = "Asset Purchase shock" , var_names = var_names)
 
 # Fourth identification scheme
 

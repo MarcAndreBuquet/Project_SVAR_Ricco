@@ -1,7 +1,9 @@
 ## RWZaccept_modified
 
 
-RWZAccept_modified <- function (a, nvar = nvar, zero = FALSE, constrained, impulses, FEVD_check, fevd0, swish = swish) # constrained prendra les matrices spécifiées + rajouter un test de FEVDs
+## Nécessité de transposer la matrice swish pour que cela marche afin d'avoir une matrice triangulaire inférieure
+
+RWZAccept_modified <- function (nvar = nvar, zero = FALSE, constrained, impulses, FEVD_check, fevd0, swish = swish, stacked_preliminary_irf = stacked_preliminary_irf, Z_cell = zero_list ) # constrained prendra les matrices spécifiées + rajouter un test de FEVDs
   
 {
   if(!zero) { # Sign restrictions only
@@ -10,24 +12,54 @@ RWZAccept_modified <- function (a, nvar = nvar, zero = FALSE, constrained, impul
      qr_object <- qr(matrix(rnorm(nvar^2, 0, 1), nvar, nvar))
      Q <- qr.Q(qr_object) 
      R <- qr.R(qr_object)
-  } else { # if addition of Zero restrictions (Arias, 2018)
-    Q <- matrix(0, nvar, nvar)
-    sign_restr_selected = constrained[[1]]
+  } else { # if addition of zero restrictions (Arias, 2018)
     
-    for(i in seq_len(nvar)) { # Build up Q
+    Q_j = NULL
+    
+    for (j in seq_len(nvar)) {
+      if (is.null(Z_cell[[j]])) {Zjf = NULL}
+      else {Zjf = Z_cell[[j]] %*% stacked_preliminary_irf}
       
-      slct_row <- which(sign_restr_selected[, i] == 0) ## A modifier en f° de comment on écrit les restrictions
-      R <- rbind(t(swish)[slct_row, ], Q[seq_len(i - 1), ]) # A priori, remplacer sigma_chol par t(swish)
-      qr_object <- qr(t(R))
-      qr_rank <- qr_object[["rank"]]
-      set <- if(qr_rank == 0) {seq_len(nvar)} else {-seq_len(qr_rank)}
-      N_i <- qr.Q(qr_object, complete = TRUE)[, set, drop = FALSE]
-      N_stdn <- crossprod(N_i, rnorm(nvar, 0, 1))
-      q_i <- N_i %*% (N_stdn / norm(N_stdn, type = "2"))
-      Q[i, ] <- q_i
+      #if (Matrix::rankMatrix(Q_j)[1] == 0){R_j = rbind(Zjf, NULL)} else {R_j = rbind(Zjf, t(Q_j))}
+      if (is.null(Q_j)){R_j = rbind(Zjf, NULL)} else {R_j = rbind(Zjf, t(Q_j))}
+      
+      if (is.null(R_j)) {
+        x = rnorm(n=n, mean = 0, sd = 1)
+        x = x / norm(x, type = "2")
+        Q_j = cbind(Q_j, x )
+      }
+      else {
+        Nj_1 = pracma::nullspace(R_j)
+        x = as.matrix(rnorm(n=nvar, mean = 0, sd = 1))
+        x = Nj_1 %*% ((t(Nj_1)%*%x)/norm(t(Nj_1) %*% x, type = "2"))
+        Q_j = cbind(Q_j, x)
+      }
+      
     }
-    Q <- t(Q)
+    Q = Q_j
+    
+    
+    
+    
+    # Q <- matrix(0, nvar, nvar)
+    # sign_restr_selected = constrained[[1]]
+    # 
+    # for(i in seq_len(nvar)) { # Build up Q
+    #   
+    #   slct_row <- which(sign_restr_selected[, i] == 0) ## A modifier en f° de comment on écrit les restrictions
+    #   R <- rbind(t(swish)[slct_row, ], Q[seq_len(i - 1), ]) # A priori, remplacer sigma_chol par t(swish)
+    #   qr_object <- qr(t(R))
+    #   qr_rank <- qr_object[["rank"]]
+    #   set <- if(qr_rank == 0) {seq_len(nvar)} else {-seq_len(qr_rank)}
+    #   N_i <- qr.Q(qr_object, complete = TRUE)[, set, drop = FALSE]
+    #   N_stdn <- crossprod(N_i, rnorm(nvar, 0, 1))
+    #   q_i <- N_i %*% (N_stdn / norm(N_stdn, type = "2"))
+    #   Q[i, ] <- q_i
+    # }
+ #   Q <- t(Q) # essayer potentiellement sans la transposée
   }    
+  
+  Q <- Q %*% diag((diag(Q) > 0) - (diag(Q) < 0)) ## A tester avec la diagonale positive (oubli d'après lecture de Arias (2018))
   
   ###### New code for checking the sign restrictions
   
@@ -64,7 +96,9 @@ RWZAccept_modified <- function (a, nvar = nvar, zero = FALSE, constrained, impul
   for (j in 1:length(constrained)) {
     
     shock = t(impulses[j,,] %*% Q) # ici variables en colonne et chocs en ligne donc OK par rapport aux spécifications
-    shock[abs(shock) < 1e-8] <- 0 # changer éventuellement l'arrondi à 0 et le réaugmenter si nécessaire
+    #shock[abs(shock) < 5*1e-3] <- 0 # changer éventuellement l'arrondi à 0 et le réaugmenter si nécessaire
+    
+    ## Plus besoin de vérifier les ZR car ont déjà été prises en compte au moment de la création de la matrice Q
     
     shock_vec <- as.vector(shock)
     shock_vec[which(shock_vec < 0)] <- -1

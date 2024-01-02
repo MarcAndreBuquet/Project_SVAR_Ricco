@@ -1,4 +1,4 @@
-RWZreject_modified <- function (Y = NULL, nlags = 4, draws = 200, subdraws = 200, nkeep = 1000, zero = FALSE,  # rajouter argument zero = FALSE, fevd_check = NULL (fait)
+RWZreject_modified <- function (Y = NULL, nlags = 4, draws = 200, subdraws = 200, nkeep = 1000, zero = FALSE,zero_period = 2, zero_list,  # rajouter argument zero = FALSE, fevd_check = NULL (fait)
           FEVD_check = NULL, KMIN = 1, KMAX = 4, constrained = NULL, constant = TRUE, 
           steps = 24) 
 {
@@ -72,13 +72,16 @@ RWZreject_modified <- function (Y = NULL, nlags = 4, draws = 200, subdraws = 200
     impulses <- array(imfhat, dim = c(nstep, nvar, nvar))
     imp2 <- impulses^2
     imp2sum <- apply(imp2, c(2, 3), cumsum)
+    stacked_preliminary_irf = NULL
+    for (i in seq_len(zero_period)) {
+      stacked_preliminary_irf = rbind(stacked_preliminary_irf, impulses[i,,])
+    }
     mse <- apply(imp2sum, c(1, 2), sum)
-    fevd0 <- array(apply(imp2sum, 3, "/", mse), dim = c(nstep,  
-                                                        nvar, nvar))   # Jusque-là fevd0 et impulses sont de la bonne taille pour calculer tous les chocs
+    fevd0 <- array(apply(imp2sum, 3, "/", mse), dim = c(nstep, nvar, nvar))   # Jusque-là fevd0 et impulses sont de la bonne taille pour calculer tous les chocs
     for (subdraws in 1:n2) {
-      a <- matrix(rnorm(nvar^2, mean = 0, sd = 1), nvar,  ###### à modifier pour pouvoir prendre en compte les restrictions sur plus d'une seule variable (modification faite)
-                  nvar)
-      RWZA <- RWZAccept_modified(a, nvar = nvar, zero = zero, FEVD_check = FEVD_check, fevd0 = fevd0, constrained = constrained, impulses = impulses, swish = swish)
+      # a <- matrix(rnorm(nvar^2, mean = 0, sd = 1), nvar,  ###### à modifier pour pouvoir prendre en compte les restrictions sur plus d'une seule variable (modification faite)
+      #             nvar)
+      RWZA <- RWZAccept_modified(nvar = nvar, zero = zero, FEVD_check = FEVD_check, fevd0 = fevd0, constrained = constrained, impulses = impulses, swish = swish, stacked_preliminary_irf = stacked_preliminary_irf, Z_cell = zero_list)
       RWZ <- RWZA$acc
       q <- RWZA$Q
       if (RWZ == 1) {
