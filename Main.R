@@ -36,17 +36,18 @@ library(HI) #install directly from the R archives as not available anymore from 
 #source("./function_package_SVAR_sign.R")
 source("./Fonctions_packages.R") # Mon organisation de fichiers est différente de celle de Marc-André : mon code est à la racine du working directory ; les données sont dans un dossier data. ~~~~Nicolas
 
-## Retrieve custom functions to make the code run
+## Retrieve the custom functions to make the code run
 
 source("./All_functions_VARsignR_modified.R")
 source("./RWZaccept_modified.R")
 source("./RWZreject_modified.R")
 source("./plot_figure_new.R")
+source("./historical_decompositions.R")
 
 ## Preliminary info for plot computation
 
 var_names = c("Real GDP (in log)", "CPI (in log)", "Asset Purchases", "Long rate", "Real Equity Prices")
-IRFs_horizon = 36
+IRFs_horizon = 70
 Confidence_bands = c(16,84)
 Pspar = 0.675 # smoothness parameter for IRF. 0= no smoothing, 1= lots of smoothing, originally = 0.675
 SL = 11 # letter sizes ggplots
@@ -81,7 +82,6 @@ VAR_data_1st = Datastream_set_transformed %>% select(CPI_US_log, Real_GDP_US_log
 
 VARselect(VAR_data_1st, lag.max = 12, type = c("both"))
           
-
 RF_VAR = vars::VAR(VAR_data_1st, type = "trend" )
 
 RF_VAR
@@ -101,9 +101,6 @@ IRFs_Cholesky_upper = IRFs_Cholesky_US$Upper$Asset_purchases_US[,3]
 
 ### Compute SVAR for the the 3 remaining schemes ------
 
-
-
-
 ## Implementation 
 
 # Data
@@ -112,6 +109,13 @@ SVAR_Fig_2_data = Datastream_set_transformed %>%
   filter(Period > 39845) %>%
   select(CPI_US_log, Real_GDP_US_log, Asset_purchases_US, Yield_US_10Y, Real_Equity_Prices_US) %>%
   as.matrix()
+
+SVAR_Fig_2_data = Datastream_set_transformed %>% 
+  filter(Period > 39845) %>%
+  select(CPI_US, Real_GDP_US, Asset_purchases_US, Yield_US_10Y, Real_Equity_Prices_US) %>%
+  as.matrix()
+
+
 
 ## Specify sign restrictions
 
@@ -123,8 +127,11 @@ Sign_restrictions_2nd_scheme = list(matrix(c(-1, 1, NA, NA, NA, 1, 1, NA, NA, NA
                                    #  matrix(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 1 , NA, NA, NA , NA , NA, NA, NA, NA , NA , NA , NA, NA), nrow = 5),
                                    #  matrix(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 1 , NA, NA, NA , NA , NA, NA, NA, NA , NA , NA , NA, NA), nrow = 5),
                                    #  matrix(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 1 , NA, NA, NA , NA , NA, NA, NA, NA , NA , NA , NA, NA), nrow = 5))
+debug(RWZreject_modified)
 
-SVAR_model_2nd_scheme = RWZreject_modified(Y = SVAR_Fig_2_data, nlags = 2, draws = 10000, subdraws = 10000, nkeep = 1000, zero = FALSE, constrained = Sign_restrictions_2nd_scheme, constant =  TRUE, steps =  10)
+SVAR_model_2nd_scheme = RWZreject_modified(Y = SVAR_Fig_2_data, nlags = 2, draws = 1000, subdraws = 1000, nkeep = 10, zero = FALSE, constrained = Sign_restrictions_2nd_scheme, constant =  TRUE, steps =  70)
+
+undebug(RWZreject_modified)
 
 IRFs_2nd_scheme = SVAR_model_2nd_scheme$IRFS
 
@@ -140,16 +147,24 @@ Plot_IRFs_2nd_scheme = plot_figure_new(IRFs_median, IRFs_lower_bound, IRFs_upper
 
 # Third identification scheme
 
-Sign_restrictions_3rd_scheme = list(matrix(c(-1, 1, NA, NA, NA, 1, 1, NA, NA, NA, 0, 0, 1 , 1, NA, NA , NA , NA, NA, NA, NA , NA , 1 , -1, NA), nrow = 5), # Period 0
-                                    matrix(c(-1, 1, NA, NA, NA, 1, 1, NA, NA, NA, 0, 0, 1 , 1, NA, NA , NA , NA, NA, NA, NA , NA , 1 , -1, NA), nrow = 5)) # Period 1
+Sign_restrictions_3rd_scheme = list(matrix(c(-1, 1, NA, NA, NA, 1, 1, NA, NA, NA, NA, NA, 1 , 1, NA, NA , NA , NA, NA, NA, NA , NA , 1 , -1, NA), nrow = 5), # Period 0
+                                    matrix(c(-1, 1, NA, NA, NA, 1, 1, NA, NA, NA, NA, NA, 1 , 1, NA, NA , NA , NA, NA, NA, NA , NA , 1 , -1, NA), nrow = 5)) # Period 1
 #  matrix(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 1 , NA, NA, NA , NA , NA, NA, NA, NA , NA , NA , NA, NA), nrow = 5),
 #  matrix(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 1 , NA, NA, NA , NA , NA, NA, NA, NA , NA , NA , NA, NA), nrow = 5),
 #  matrix(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 1 , NA, NA, NA , NA , NA, NA, NA, NA , NA , NA , NA, NA), nrow = 5),
 #  matrix(c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 1 , NA, NA, NA , NA , NA, NA, NA, NA , NA , NA , NA, NA), nrow = 5))
 
-debug(RWZreject_modified)
+Z_1 = matrix(c(0,0,1,0,0,0,0,1,0,0), ncol = 10 , nrow = 1)
+Z_2 = matrix(c(0,0,1,0,0,0,0,1,0,0), ncol = 10 , nrow = 1)
+Z_cell = list(Z_1,Z_2,NULL,NULL,NULL)
 
-SVAR_model_3rd_scheme = RWZreject_modified(Y = SVAR_Fig_2_data, nlags = 2, draws = 10000, subdraws = 10000, nkeep = 1000, zero = TRUE, constrained = Sign_restrictions_3rd_scheme, constant =  TRUE, steps =  10)
+SVAR_model_3rd_scheme = RWZreject_modified(Y = SVAR_Fig_2_data, nlags = 2, draws = 100, subdraws = 100, nkeep = 10, zero = TRUE, zero_period = 2, zero_list = Z_cell ,  constrained = Sign_restrictions_3rd_scheme, constant =  TRUE, steps = 70)
+
+dim(SVAR_model_3rd_scheme$SHOCKS)
+
+dim(SVAR_model_3rd_scheme$IRFS)
+
+SVAR_model_3rd_scheme = RWZreject_modified(Y = SVAR_Fig_2_data, nlags = 2, draws = 10000, subdraws = 10000, nkeep = 1000, zero = TRUE, zero_period = 2, constrained = Sign_restrictions_3rd_scheme, constant =  TRUE, steps = 70)
 
 IRFs_3rd_scheme = SVAR_model_3rd_scheme$IRFS
 
@@ -161,7 +176,29 @@ IRFs_median = Data_retrieval(IRFs, nb_var = 5, nb_shocks = 5, horizon = 10)[3,]
 IRFs_lower_bound = Data_retrieval(IRFs_lower_bound_start, nb_var = 5, nb_shocks = 5, horizon = 10)[3,]
 IRFs_upper_bound = Data_retrieval(IRFs_upper_bound_start, nb_var = 5, nb_shocks = 5, horizon = 10)[3,]
 
-Plot_IRFs_3rd_scheme = plot_figure_new(IRFs_median, IRFs_lower_bound, IRFs_upper_bound, horizon = 10, nb_var = 5 , shock = "Asset Purchase shock" , var_names = var_names   )
+Plot_IRFs_3rd_scheme = plot_figure_new(IRFs_median, IRFs_lower_bound, IRFs_upper_bound, horizon = 10, nb_var = 5 , shock = "Asset Purchase shock" , var_names = var_names)
+
+###### Part on HDs
+
+debug(historical_decomposition)
+
+HDs_third_scheme = historical_decomposition(SVAR_model_3rd_scheme$IRFS, SVAR_model_3rd_scheme$SHOCKS, series = 1) # series signal the position of the variable to decompose in the original vector
+
+Period_date = Datastream_set$Period_date[(length(Datastream_set$Period_date) - dim(HDs_third_scheme)[2]+ 1) :(length(Datastream_set$Period_date))]
+Shock_to_decompose = 1
+
+
+HDs_third_scheme_plot = apply(HDs_third_scheme[,,Shock_to_decompose], MARGIN = c(2) , FUN = median) %>%
+  data.frame(., Period_date) %>%
+  rename(`Cumulative impact` = '.', Period = Period_date) %>%
+  ggplot() +
+  theme_bw() + 
+  geom_bar(aes(x = Period, y = `Cumulative impact`), position = "stack", stat = "identity")
+
+HDs_third_scheme_plot
+
+
+######
 
 # Fourth identification scheme
 

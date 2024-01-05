@@ -29,6 +29,8 @@ library(rio)
 library(glue)
 library(ggformula)
 library(cowplot)
+library(pracma)
+library(Matrix)
 
 library("pacman")
 #pacman::p_load(tidyverse,ggplot2,dplyr,janitor,viridisLite,lmtest,stargazer,readxl,plyr,lubridate,
@@ -61,12 +63,14 @@ create_diff_vars <- function(data, vars, diff_order = 1) {
   #return(new_data)
 }
 
-create_log_vars <- function(data, vars, base = exp(1)) {
+create_log_vars <- function(data, vars, base = exp(1), scale_factor = 100) {
   
   new_names <- paste(vars, "_log", sep = "")
-  log_vars <- lapply(data[, vars], log, base = base)
+  log_vars <- lapply(data[, vars], function(x) log(x, base = base) * scale_factor)
+  #log_vars <- lapply(data[, vars], log, base = base)
   names(log_vars) <- new_names
-  new_data <- cbind(data, log_vars)
+  log_vars <- log_vars
+  new_data <- cbind(data , log_vars)
   return(new_data)
 }
 
@@ -410,7 +414,8 @@ deseasonalization_dummies = function(dataframe, period_column, columns) {
 #                  geom_line(data = as.data.frame(data[var,shock]) %>% setNames(., "IRFs")  , aes(x = 1:horizon, y = IRFs))
 #         }
 #            }
-#          },
+
+
 #         3 = {for (shock in 1:nb_shocks){
 #           for (var in 1:nb_var) {
 #             data_combined[[var,shock]] = cbind(data_lower[[var,shock]], data_upper[[var,shock]])
