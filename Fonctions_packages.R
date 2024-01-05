@@ -1,5 +1,6 @@
 ## Charger packages
 
+library(plyr) # it is recommanded to load plyr before dplyr
 library(tidyverse) # manipulate data
 library(ggplot2) # visualize data
 library(dplyr)
@@ -8,7 +9,6 @@ library(viridisLite) # nice color chart
 library(lmtest) # linear regression package
 library(stargazer) # export regression to a nice format for inclusion in word document
 library(readxl)
-library(plyr)
 library(lubridate)
 library(tidyr)
 library(purrr)
