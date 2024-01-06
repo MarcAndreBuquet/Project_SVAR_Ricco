@@ -1,4 +1,4 @@
-RWZreject_modified <- function (Y = NULL, nlags = 4, draws = 200, subdraws = 200, nkeep = 1000, zero = FALSE,zero_period = 2, zero_list,  # rajouter argument zero = FALSE, fevd_check = NULL (fait)
+RWZreject_modified <- function (Y = NULL, nlags = 4, draws = 200, subdraws = 200, nkeep = 1000, zero = FALSE,zero_period = 2, zero_list = NULL,  # rajouter argument zero = FALSE, fevd_check = NULL (fait)
           FEVD_check = NULL, KMIN = 1, KMAX = 4, constrained = NULL, constant = TRUE, 
           steps = 24) 
 {
@@ -52,8 +52,9 @@ RWZreject_modified <- function (Y = NULL, nlags = 4, draws = 200, subdraws = 200
   imp <- array(NA, c(nstep, nvar, nvar)) # rajouter une dimension (fait) et transformer en array (fait)
   fevd <- array(NA, c(nstep, nvar, nvar)) # rajouter une dimension (fait)
   goodfevd <- array(NA, c(nkeep, nstep, nvar , nvar)) # à modifier comme précédemment (fait)
-  goodshock <- array(NA, c(nkeep, nnobs))
-  uhatt <- matrix(NA, nnobs, 1)
+  goodshock <- array(NA, c(nkeep, nnobs, nvar))
+  uhatt <- matrix(NA, nnobs, nvar) # modifié en changeant la 2ème dimension de 1 à nvar 
+  HDs <- matrix(NA, nnobs, nvar) # rajouté pour initialiser les HDs
   accept <- 0
   message("Starting MCMC, ", date(), ".", sep = "")
   pb0 <- txtProgressBar(min = 0, max = n1, style = 3)
@@ -97,12 +98,13 @@ RWZreject_modified <- function (Y = NULL, nlags = 4, draws = 200, subdraws = 200
         uhat <- Y[nnobs0:nobs, ] - data %*% bhat # OK
         
         ## enlever car inutile et rajoute du temps de calcul
-        
-        # for (i in 1:nnobs) {
-        #   uhatt[i, ] <- uhat[i, ] %*% (solve(swish) %*% 
-        #                                  q)
-        # }
-        # goodshock[accept, ] <- t(uhatt)
+
+         for (i in 1:nnobs) {
+           uhatt[i, ] <- uhat[i, ] %*% (solve(swish) %*%
+                                          q)
+         }
+         goodshock[accept,, ] <- t(uhatt)
+         
       }
       else {
         next
@@ -129,7 +131,7 @@ RWZreject_modified <- function (Y = NULL, nlags = 4, draws = 200, subdraws = 200
     else {
       goodresp <- goodresp[1:accept, , ,] # à modifier (fait)
       goodfevd <- goodfevd[1:accept, , ,] # à modifier (fait)
-    #  goodshock <- goodshock[1:accept, ]
+      goodshock <- goodshock[1:accept, ,]
       message("\n Warning! Had only ", accept, " accepted draw(s) out of ", 
               ntot, ".", sep = "")
     }
@@ -147,6 +149,6 @@ RWZreject_modified <- function (Y = NULL, nlags = 4, draws = 200, subdraws = 200
                              varnames)
   }
   message("\n MCMC finished, ", date(), ".", sep = "")
-  return(list(IRFS = goodresp, FEVDS = goodfevd, #SHOCKS = goodshock, 
+  return(list(IRFS = goodresp, FEVDS = goodfevd, SHOCKS = goodshock, 
               BDraws = BDraws, SDraws = SDraws))
 }
